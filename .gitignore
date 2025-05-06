@@ -1,0 +1,32 @@
+# Ignore SimFin API key file
+simfin_api_key.txt
+
+# Ignore Python bytecode files
+__pycache__/
+*.pyc
+
+# Ignore downloaded data directory (if it was inside the project, which is not recommended)
+# ~/simfin_data/
+# or if you used a relative path:
+# simfin_data/
+
+# Ignore virtual environment directory (if it was inside the project, which is not recommended)
+# venv/
+# .venv/
+
+# Ignore editor/IDE specific files (example for VS Code)
+.vscode/
+
+# Ignore OS generated files
+.DS_Store # macOS
+Thumbs.db # Windows
+
+# Ignore SimFin API key file
+simfin_api_key.txt
+
+# Ignore Python bytecode files
+__pycache__/
+*.pyc
+
+# Ignore the directory where generated data is saved
+Data/

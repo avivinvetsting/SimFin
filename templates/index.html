@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ ticker }} Financial Statements</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body { margin: 20px; }
+        h1 { margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ ticker }} Financial Statements ({{ variant }})</h1>
+        <p>Select a statement to view:</p>
+        <ul>
+            {# Updated links to use the generic route 'show_statement' #}
+            <li><a href="{{ url_for('show_statement', statement_type='income') }}">Income Statement</a></li>
+            <li><a href="{{ url_for('show_statement', statement_type='balance') }}">Balance Sheet</a></li>
+            <li><a href="{{ url_for('show_statement', statement_type='cashflow') }}">Cash Flow Statement</a></li>
+        </ul>
+        <p>Data provided by SimFin. Note: Data availability may vary based on your API key tier and SimFin's coverage.</p>
+        {# Optional: Show where files are saved - ensure variable name matches app.py #}
+        {% if data_save_base_dir %}
+             <p>Data for {{ ticker }} downloaded and saved upon server startup to: {{ data_save_base_dir }}</p>
+        {% endif %}
+    </div>
+</body>
+</html>

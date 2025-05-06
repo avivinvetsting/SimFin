@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ ticker }} {{ statement_name }} - SimFin</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body { margin: 20px; }
+        h1, h2 { margin-bottom: 20px; }
+        table { margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ ticker }} {{ statement_name }} ({{ variant }})</h1>
+        <p><a href="{{ url_for('index') }}">Back to Statements List</a></p>
+
+        {{ data_html | safe }}
+
+        <p>Data provided by SimFin. Note: Data availability may vary based on your API key tier and SimFin's coverage.</p>
+    </div>
+</body>
+</html>
