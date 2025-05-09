@@ -5,6 +5,8 @@ import os
 import time
 from flask import Flask, render_template, url_for
 
+
+Tiker = 'ASML'
 # --- API Key Handling ---
 API_KEY_FILE = 'simfin_api_key.txt'
 
@@ -52,7 +54,8 @@ print(f"Filtered data will be saved to the 'Data' directory: {data_save_base_dir
 app = Flask(__name__)
 
 # Define the ticker and variant to use
-TARGET_TICKER = 'AAPL'
+TARGET_TICKER = Tiker
+
 TARGET_VARIANT = 'quarterly' # Or 'annual'
 
 # --- Data Download, Filtering, and Saving upon Server Startup ---
