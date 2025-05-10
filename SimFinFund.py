@@ -1,199 +1,170 @@
+# SimFinFund.py (גרסה מלאה עם תיקון set_data_dir)
 import simfin as sf
-from simfin.names import *
 import pandas as pd
 import os
-import time
 from flask import Flask, render_template, url_for
 
+# --- ייבוא פונקציית ההורדה ---
+from Downloader import download_all_statements_for_ticker # ודא ששם הקובץ הוא downloader.py
 
-Tiker = 'ASML'
-# --- API Key Handling ---
+# --- הגדרות קבועות ---
+TARGET_TICKER = 'TSLA'
+TARGET_VARIANT = 'quarterly'
+TARGET_MARKET = 'us'
+
+# --- הגדרות API וספריות ---
 API_KEY_FILE = 'simfin_api_key.txt'
 
 def load_simfin_api_key():
-    api_key = None
+    api_key = 'free'
     if os.path.exists(API_KEY_FILE):
         try:
             with open(API_KEY_FILE, 'r') as f:
-                api_key = f.read().strip()
-            if not api_key:
-                print(f"Warning: API key file {API_KEY_FILE} is empty. Using 'free' data.")
-                api_key = 'free'
+                read_key = f.read().strip()
+            if read_key:
+                api_key = read_key
+                print("SimFinFund.py: API key loaded from file.")
             else:
-                 print("API key loaded successfully from file.")
+                print(f"SimFinFund.py: API key file is empty. Using 'free'.")
         except IOError:
-            print(f"Warning: Could not read API key file {API_KEY_FILE}. Using 'free' data.")
-            api_key = 'free'
+            print(f"SimFinFund.py: Could not read API key file. Using 'free'.")
     else:
-        print(f"Warning: API key file {API_KEY_FILE} not found. Using 'free' data.")
-        api_key = 'free'
+        print(f"SimFinFund.py: API key file not found. Using 'free'.")
     return api_key
 
-# Load the API key and configure SimFin
-api_key = load_simfin_api_key()
-sf.set_api_key(api_key)
+api_key_to_set = load_simfin_api_key()
+sf.set_api_key(api_key_to_set)
 
-# Set the local directory where SimFin data-files are stored (for SimFin's internal cache)
-# This is separate from where we will save the filtered data.
-simfin_cache_dir = os.path.expanduser('~/simfin_data/') # Keep SimFin's cache in the home directory
-sf.set_data_dir(simfin_cache_dir)
+# --- הגדרת תיקיית המטמון של SimFin ---
+simfin_data_directory = os.path.join(os.path.expanduser('~'), 'simfin_data')
+os.makedirs(simfin_data_directory, exist_ok=True) 
+sf.set_data_dir(simfin_data_directory)
+print(f"SimFinFund.py: SimFin data directory set to: {simfin_data_directory}")
 
+script_dir = os.path.dirname(os.path.abspath(__file__))
+PROCESSED_DATA_BASE_DIR = os.path.join(script_dir, 'Data')
+os.makedirs(PROCESSED_DATA_BASE_DIR, exist_ok=True)
+print(f"SimFinFund.py: Processed CSVs will be saved to: {PROCESSED_DATA_BASE_DIR}")
 
-# --- Define the directory for saving filtered data relative to the script ---
-# Get the directory of the current script
-script_dir = os.path.dirname(__file__)
-# Define the path to the new Data directory
-data_save_base_dir = os.path.join(script_dir, 'Data') # <-- Changed to save directly in Data
-
-# Create the base Data directory if it doesn't exist
-os.makedirs(data_save_base_dir, exist_ok=True)
-print(f"Filtered data will be saved to the 'Data' directory: {data_save_base_dir}")
-
-
-# --- Flask Application Setup ---
 app = Flask(__name__)
 
-# Define the ticker and variant to use
-TARGET_TICKER = Tiker
-
-TARGET_VARIANT = 'quarterly' # Or 'annual'
-
-# --- Data Download, Filtering, and Saving upon Server Startup ---
-# This block runs ONCE when the script starts, before app.run()
-print("\n--- Starting initial data download, filtering, and saving ---")
-
-datasets_to_process = {
-    'Income Statement': 'IncomeDownloadCode',
-    'Balance Sheet': 'BalanceDownloadCode',
-    'Cash Flow Statement': 'CashflowDownloadCode'
+# --- גלובלי לאחסון נתיבי קבצים או שגיאות ---
+SAVED_FILE_PATHS = {
+    'income': None,
+    'balance': None,
+    'cashflow': None
+}
+DOWNLOAD_ERRORS = {
+    'income': None,
+    'balance': None,
+    'cashflow': None
 }
 
-# Dictionary to hold the full market DataFrames from imports (optional, mainly for debugging)
-downloaded_dfs = {}
+def initialize_data():
+    """Downloads data on startup and saves CSVs."""
+    print(f"\nSimFinFund.py: --- Initializing data for {TARGET_TICKER} ---")
+    
+    all_statements_data = download_all_statements_for_ticker(
+        ticker_symbol=TARGET_TICKER,
+        variant=TARGET_VARIANT,
+        market=TARGET_MARKET
+    )
 
-for dataset_name, module_name in datasets_to_process.items():
-    print(f"\nProcessing {dataset_name} data (from module: {module_name})...")
-    try:
-        # Import the download module - this triggers the download (or cache load) inside it
-        # Ensure these download modules DO NOT have sf.set_api_key or os.chdir
-        module = __import__(module_name) # Use __import__ for dynamic import
-
-        if hasattr(module, 'df') and isinstance(module.df, pd.DataFrame) and not module.df.empty:
-            print(f"Successfully loaded full market DataFrame from {module_name}.")
-            df_full = module.df
-            downloaded_dfs[dataset_name] = df_full # Store the full DataFrame
-
-            # --- Filter and Save the filtered data to a CSV file ---
-            if TARGET_TICKER in df_full.index.get_level_values('Ticker'):
-                 ticker_data = df_full.loc[TARGET_TICKER]
-                 print(f"Filtered data for ticker {TARGET_TICKER} for {dataset_name}.")
-
-                 # Create a subdirectory for the ticker within the Data directory
-                 ticker_save_dir = os.path.join(data_save_base_dir, TARGET_TICKER) # <-- Save in Data/Ticker/
-                 os.makedirs(ticker_save_dir, exist_ok=True)
-
-                 # Define the filename
-                 safe_dataset_name = dataset_name.replace(" ", "_").replace("/", "_").replace("\\", "_")
-                 file_name = f"{TARGET_TICKER}_{safe_dataset_name}_{TARGET_VARIANT}.csv"
-                 save_path = os.path.join(ticker_save_dir, file_name)
-
-                 try:
-                     ticker_data.to_csv(save_path, index=True) # Save with index (Report Date)
-                     print(f"Successfully saved filtered data to: {save_path}")
-                 except Exception as save_e:
-                     print(f"Error saving filtered data to CSV ({save_path}): {save_e}")
-                 # --- End Save ---
-
-            else:
-                 print(f"Info: No {dataset_name} data found for ticker {TARGET_TICKER} in the loaded dataset.")
-
-        elif hasattr(module, 'df') and isinstance(module.df, dict) and 'Error' in module.df:
-            # If the module's df is an error dict (from the except block in the module itself if it has one)
-             print(f"Error reported during import of {module_name}: {module.df['Error']}")
-        else:
-            print(f"Warning: Could not load full market DataFrame from {module_name}. 'df' not found or is empty.")
-
-    except ImportError as e:
-        print(f"Import Error: Could not import module {module_name}: {e}. Make sure the file exists and has no syntax errors.")
-    except Exception as e:
-        print(f"An unexpected error occurred while processing {module_name}: {e}")
-
-    # Optional: Add a small delay between processing different datasets during startup
-    # time.sleep(1) # Re-enabled delay if needed
-
-print("\n--- Initial data processing complete ---")
-
-
-# --- Flask Routes (Now loading from saved files) ---
-
-@app.route('/')
-def index():
-    """
-    Landing page with links to the different reports.
-    """
-    # Passing data_save_base_dir to the template is optional, but helpful
-    return render_template('index.html',
-                           ticker=TARGET_TICKER,
-                           variant=TARGET_VARIANT,
-                           data_save_base_dir=data_save_base_dir)
-
-@app.route('/<statement_type>')
-def show_statement(statement_type):
-    """
-    Generic route to display statement data loaded from saved CSV files.
-    """
-    statement_name_map = {
-        'income': 'Income Statement',
-        'balance': 'Balance Sheet',
-        'cashflow': 'Cash Flow Statement'
+    statement_keys = ['income', 'balance', 'cashflow']
+    human_readable_names = {
+        'income': 'Income_Statement',
+        'balance': 'Balance_Sheet',
+        'cashflow': 'Cash_Flow_Statement'
     }
-    display_name = statement_name_map.get(statement_type, 'Unknown Statement')
 
-    data_html = f"<p style='color: red;'>Error: Could not load data for {display_name}.</p>"
-    file_found = False
+    for key in statement_keys:
+        data_item = all_statements_data.get(key)
+        if isinstance(data_item, pd.DataFrame) and not data_item.empty: # ודא שה-DataFrame לא ריק לפני שמירה
+            file_statement_name = human_readable_names[key]
+            file_name = f"{TARGET_TICKER}_{file_statement_name}_{TARGET_VARIANT}.csv"
+            ticker_save_dir = os.path.join(PROCESSED_DATA_BASE_DIR, TARGET_TICKER)
+            os.makedirs(ticker_save_dir, exist_ok=True)
+            save_path = os.path.join(ticker_save_dir, file_name)
+            try:
+                data_item.to_csv(save_path, index=True)
+                SAVED_FILE_PATHS[key] = save_path
+                DOWNLOAD_ERRORS[key] = None # נקה שגיאה קודמת אם הייתה
+                print(f"SimFinFund.py: Saved {key} data to {save_path}")
+            except Exception as e:
+                DOWNLOAD_ERRORS[key] = f"Error saving {key} CSV: {e}"
+                SAVED_FILE_PATHS[key] = None
+                print(f"SimFinFund.py: {DOWNLOAD_ERRORS[key]}")
+        elif isinstance(data_item, pd.DataFrame) and data_item.empty: # DataFrame ריק (לא נמצאו נתונים)
+            DOWNLOAD_ERRORS[key] = f"No data found for {key} statement of {TARGET_TICKER} (empty DataFrame)."
+            SAVED_FILE_PATHS[key] = None # אל תשמור קובץ ריק, תן לשגיאה להופיע
+            print(f"SimFinFund.py: {DOWNLOAD_ERRORS[key]}")
+        elif isinstance(data_item, dict) and "Error" in data_item:
+            DOWNLOAD_ERRORS[key] = data_item.get("Details", "Unknown error from downloader.")
+            SAVED_FILE_PATHS[key] = None
+            print(f"SimFinFund.py: Error fetching {key} data: {DOWNLOAD_ERRORS[key]}")
+        else: # מקרה לא צפוי
+            DOWNLOAD_ERRORS[key] = f"Unexpected data type or no data returned for {key}."
+            SAVED_FILE_PATHS[key] = None
+            print(f"SimFinFund.py: {DOWNLOAD_ERRORS[key]}")
 
-    # Construct the expected save path based on the statement type
-    safe_dataset_name = display_name.replace(" ", "_").replace("/", "_").replace("\\", "_")
-    file_name = f"{TARGET_TICKER}_{safe_dataset_name}_{TARGET_VARIANT}.csv"
-    save_path = os.path.join(data_save_base_dir, TARGET_TICKER, file_name) # <-- Load from Data/Ticker/
+    print(f"SimFinFund.py: --- Data initialization complete ---")
+    print(f"SimFinFund.py: Saved file paths: {SAVED_FILE_PATHS}")
+    print(f"SimFinFund.py: Download errors: {DOWNLOAD_ERRORS}")
 
-    print(f"\nWeb request for {display_name}. Attempting to load data from file: {save_path}")
+initialize_data()
 
-    if os.path.exists(save_path):
+# --- Flask Routes ---
+@app.route('/')
+def route_index():
+    return render_template('index.html', ticker=TARGET_TICKER, variant=TARGET_VARIANT)
+
+def render_statement_page(statement_key, page_title):
+    file_path = SAVED_FILE_PATHS.get(statement_key)
+    error_from_init = DOWNLOAD_ERRORS.get(statement_key) # שגיאה משלב ההורדה הראשונית
+    
+    data_html = None
+    current_error_message = error_from_init # השתמש בשגיאה מההורדה כברירת מחדל
+    current_info_message = None
+
+    print(f"SimFinFund.py: Request for {page_title}. Expected file path: {file_path}, Initial error: {error_from_init}")
+
+    if file_path and os.path.exists(file_path):
         try:
-            # Read the data from the saved CSV file
-            # Assuming index column is the first column (as saved with index=True)
-            ticker_data = pd.read_csv(save_path, index_col=0)
-            file_found = True
-            print(f"Successfully loaded data from file: {save_path}")
-
-            if not ticker_data.empty:
-                 # Convert numeric columns to appropriate format if needed (optional)
-                 # for col in ticker_data.columns:
-                 #     if pd.api.types.is_numeric_dtype(ticker_data[col]):
-                 #         ticker_data[col] = ticker_data[col].apply(lambda x: f'{x:,.0f}' if pd.notnull(x) else '') # Format as integers with commas
-
-                 data_html = ticker_data.to_html(index=True, classes='table table-striped')
-            else:
-                 data_html = f"<p style='color: blue;'>Info: The saved file ({file_name}) is empty.</p>"
-
+            df = pd.read_csv(file_path, index_col=0)
+            if not df.empty:
+                data_html = df.to_html(classes='table table-striped table-hover table-sm', border=0, index=True)
+                current_error_message = None # אם הצלחנו לטעון, אין שגיאה להציג מהקריאה
+                current_info_message = f"Data loaded from: {os.path.basename(file_path)}"
+            else: # הקובץ קיים אך ריק
+                current_info_message = f"The data file ({os.path.basename(file_path)}) was found but is empty. No data was available from SimFin during initialization."
+                current_error_message = None # זו אינפורמציה, לא שגיאת קריאה
         except Exception as e:
-            data_html = f"<p style='color: red;'>Error reading data file ({file_name}): {e}</p>"
-            print(data_html)
-    else:
-        data_html = f"<p style='color: blue;'>Info: Data file not found for {display_name} ({file_name}). Data may not have been downloaded or saved successfully during server startup.</p>"
-        print(data_html)
+            current_error_message = f"Error reading or processing CSV file {file_path}: {e}"
+            print(f"SimFinFund.py: {current_error_message}")
+            data_html = None # ודא שאין HTML אם יש שגיאת קריאה
+    elif not file_path and not error_from_init: # אין קובץ וגם לא נרשמה שגיאה בהורדה - לא סביר
+         current_info_message = f"Data file path for {page_title.lower()} was not recorded and no download error was noted."
+    # אם file_path הוא None אבל error_from_init קיים, השגיאה הזו תוצג
 
-
-    return render_template('statement.html',
+    return render_template('statement_page.html',
                            ticker=TARGET_TICKER,
                            variant=TARGET_VARIANT,
-                           statement_name=display_name,
-                           data_html=data_html)
+                           statement_name=page_title,
+                           data_html=data_html,
+                           info_message=current_info_message,
+                           error_message=current_error_message)
 
+@app.route('/income')
+def route_income():
+    return render_statement_page('income', 'Income Statement')
 
-# --- Running the Flask App ---
+@app.route('/balance')
+def route_balance():
+    return render_statement_page('balance', 'Balance Sheet')
+
+@app.route('/cashflow')
+def route_cashflow():
+    return render_statement_page('cashflow', 'Cash Flow Statement')
+
 if __name__ == '__main__':
-    # Add data_save_base_dir to the app config for potential use in templates (optional)
-    app.config['DATA_SAVE_BASE_DIR'] = data_save_base_dir
     app.run(debug=True)
