@@ -8,7 +8,7 @@ from flask import Flask, render_template, url_for
 from Downloader import download_all_statements_for_ticker # ודא ששם הקובץ הוא downloader.py
 
 # --- הגדרות קבועות ---
-TARGET_TICKER = 'TSLA'
+TARGET_TICKER = 'PYPL'
 TARGET_VARIANT = 'quarterly'
 TARGET_MARKET = 'us'
 
