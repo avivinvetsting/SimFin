@@ -5,7 +5,7 @@ import os
 from flask import Flask, render_template, request, url_for, redirect, flash, session
 
 # --- ייבוא פונקציית ההורדה ---
-from downloader import download_financial_statements 
+from Downloader import download_financial_statements 
 
 # --- הגדרות API ---
 API_KEY_FILE = 'simfin_api_key.txt'
