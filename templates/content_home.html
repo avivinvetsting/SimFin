@@ -1,0 +1,14 @@
+<p>ברוכים הבאים למנתח הנתונים הפיננסיים מבית SimFin.</p>
+<p>אנא הזן סימול טיקר בשדה בחלק העליון של הדף ולחץ על "בחר מניה והורד נתונים" כדי להתחיל.</p>
+<p>לאחר בחירת מניה, תוכל לנווט באמצעות התפריט בצד כדי לצפות בגרפים (שנתיים או רבעוניים) או לבצע פעולות נוספות.</p>
+
+{% if session.get('data_download_status') %}
+    <h4 class="mt-4">סטטוס הורדת נתונים אחרונה (עבור {{ session.get('current_ticker', 'לא נבחר טיקר') }}):</h4>
+    <ul class="list-group">
+        {% for key, status in session.get('data_download_status', {}).items() %}
+            <li class="list-group-item {% if 'Error' in status %}list-group-item-danger{% elif 'NoDataFound' in status or 'empty' in status %}list-group-item-warning{% else %}list-group-item-success{% endif %}">
+                <strong>{{ key.replace('_', ' ') | title }}:</strong> {{ status }}
+            </li>
+        {% endfor %}
+    </ul>
+{% endif %}

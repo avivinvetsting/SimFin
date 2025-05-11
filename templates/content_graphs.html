@@ -1,0 +1,16 @@
+{% if current_ticker %}
+    <p>כאן יוצגו גרפים ({{ graph_type }}) עבור הטיקר: <strong>{{ current_ticker }}</strong>.</p>
+    
+    {% if error_message_for_template %}
+        <div class="alert alert-warning">{{ error_message_for_template }}</div>
+    {% endif %}
+
+    {% if graph_content_for_template %}
+        <div>{{ graph_content_for_template | safe }}</div>
+    {% else %}
+        <p>אין תוכן גרפים להצגה כרגע.</p>
+    {% endif %}
+
+{% else %}
+    <p class="text-warning">אנא בחר טיקר תחילה כדי לראות גרפים.</p>
+{% endif %}
