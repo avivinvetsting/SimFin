@@ -1,9 +1,35 @@
-<p>ברוכים הבאים למנתח הנתונים הפיננסיים מבית SimFin.</p>
+{% if current_ticker %}
+    <h4 class="mt-4">גרף נרות יומי עבור {{ current_ticker }} (שנה אחרונה)</h4>
+    {% if price_data_error %}
+        <div class="alert alert-warning">{{ price_data_error }}</div>
+    {% elif candlestick_chart_json %}
+        <div class="row">
+            <div class="col-md-12">
+                <div id="candlestickChartDiv"></div> </div>
+        </div>
+        <script type="text/javascript">
+            var candlestickData = {{ candlestick_chart_json | safe }};
+            if (candlestickData && candlestickData.data && candlestickData.layout) {
+                Plotly.newPlot('candlestickChartDiv', candlestickData.data, candlestickData.layout, {responsive: true});
+                console.log("Candlestick chart plotted.");
+            } else if (candlestickData && candlestickData.error) {
+                document.getElementById('candlestickChartDiv').innerHTML = "<p class='text-danger'>" + candlestickData.error + "</p>";
+            } else {
+                document.getElementById('candlestickChartDiv').innerHTML = "<p class='text-secondary'>גרף נרות לא זמין או אין נתונים.</p>";
+            }
+        </script>
+    {% else %}
+        <p>טוען גרף נרות...</p>
+    {% endif %}
+    <hr>
+{% endif %}
+
+<p {% if current_ticker %}class="mt-4"{% endif %}>ברוכים הבאים למנתח הנתונים הפיננסיים.</p>
 <p>אנא הזן סימול טיקר בשדה בחלק העליון של הדף ולחץ על "בחר מניה והורד נתונים" כדי להתחיל.</p>
-<p>לאחר בחירת מניה, תוכל לנווט באמצעות התפריט בצד כדי לצפות בגרפים (שנתיים או רבעוניים) או לבצע פעולות נוספות.</p>
+<p>לאחר בחירת מניה, תוכל לנווט באמצעות התפריט בצד כדי לצפות בגרפים או לבצע פעולות נוספות.</p>
 
 {% if session.get('data_download_status') %}
-    <h4 class="mt-4">סטטוס הורדת נתונים אחרונה (עבור {{ session.get('current_ticker', 'לא נבחר טיקר') }}):</h4>
+    <h4 class="mt-4">סטטוס הורדת דוחות SimFin אחרונה (עבור {{ session.get('current_ticker', 'לא נבחר טיקר') }}):</h4>
     <ul class="list-group">
         {% for key, status in session.get('data_download_status', {}).items() %}
             <li class="list-group-item 

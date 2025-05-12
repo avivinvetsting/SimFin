@@ -1,31 +1,76 @@
 {% if current_ticker %}
     <p>גרפים ({{ graph_type }}) עבור הטיקר: <strong>{{ current_ticker }}</strong>.</p>
     
-    {% if data_error_message %}
-        <div class="alert alert-danger mt-3">{{ data_error_message }}</div>
-    {% endif %}
-    {% if data_info_message %}
-        <div class="alert alert-info mt-3">{{ data_info_message }}</div>
-    {% endif %}
+    <div id="debug_messages">
+        {% if data_error_message %}
+            <div class="alert alert-danger mt-3">שגיאת נתונים: {{ data_error_message }}</div>
+        {% endif %}
+        {% if data_info_message %}
+            <div class="alert alert-info mt-3">הודעת מידע: {{ data_info_message }}</div>
+        {% endif %}
+    </div>
 
     <div class="row mt-3">
-        <div class="col-lg-6 mb-4" style="border: 1px solid lightgray; padding: 5px;"> <h5>גרף הכנסות</h5> {% if graph_revenue_html %}
-                {{ graph_revenue_html | safe }}
-            {% elif not data_error_message and not data_info_message %} 
-                <div class="alert alert-secondary">גרף הכנסות לא זמין או אין נתונים.</div>
-            {% endif %}
+        <div class="col-lg-6 mb-4" style="border: 1px solid lightgray; padding: 5px;">
+            <h5>גרף הכנסות</h5>
+            <div id="revenueGraphDiv" style="height:450px; width:100%;"></div>
         </div>
-        <div class="col-lg-6 mb-4" style="border: 1px solid lightgray; padding: 5px;"> <h5>גרף רווח נקי</h5> {% if graph_net_income_html %}
-                {{ graph_net_income_html | safe }}
-            {% elif not data_error_message and not data_info_message %}
-                <div class="alert alert-secondary">גרף רווח נקי לא זמין או אין נתונים.</div>
-            {% endif %}
+        <div class="col-lg-6 mb-4" style="border: 1px solid lightgray; padding: 5px;">
+            <h5>גרף רווח נקי</h5>
+            <div id="netIncomeGraphDiv" style="height:450px; width:100%;"></div>
         </div>
     </div>
     
-    {% if not graph_revenue_html and not graph_net_income_html and not data_error_message and not data_info_message %}
-         <p class="mt-3">לא נוצרו גרפים. בדוק אם קיימים נתונים או אם יש שגיאות בטעינתם.</p>
-    {% endif %}
+    <script type="text/javascript">
+        function renderPlotlyChart(divId, jsonDataString, chartName) {
+            console.log("Attempting to render: " + chartName);
+            const chartDiv = document.getElementById(divId);
+            if (!chartDiv) {
+                console.error("Chart DIV not found: " + divId);
+                return;
+            }
+
+            if (jsonDataString && jsonDataString !== 'None' && jsonDataString.trim() !== '') {
+                try {
+                    // ננסה לפרש את ה-JSON שהועבר מהשרת
+                    // לפעמים צריך להשתמש ב-Flask의 tojson פילטר כדי לוודא שהמחרוזת בטוחה ל-JS
+                    // או להעביר את ה-JSON כשהוא כבר אובייקט JS דרך ה-template.
+                    // כרגע, נניח שהוא מגיע כמחרוזת JSON תקינה.
+                    
+                    // הסרת תגיות HTML אם בטעות נכנסו למחרוזת ה-JSON
+                    // זה קורה אם בטעות השתמשנו ב-safe filter על מחרוזת שכבר מכילה HTML
+                    // או אם ה-JSON עצמו מכיל מחרוזות HTML (לא אמור לקרות עם fig.data, fig.layout)
+                    // jsonDataString = jsonDataString.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+
+                    var chartData = JSON.parse(jsonDataString); // פרש את מחרוזת ה-JSON
+                    
+                    if (chartData && chartData.data && chartData.layout) {
+                        Plotly.newPlot(divId, chartData.data, chartData.layout, {responsive: true});
+                        console.log(chartName + " graph plotted successfully using JSON data.");
+                    } else if (chartData && chartData.error) {
+                        chartDiv.innerHTML = "<p class='text-danger'>Error in chart data for " + chartName + ": " + chartData.error + "</p>";
+                        console.error("Error in chart data for " + chartName + ":", chartData.error);
+                    } else {
+                        chartDiv.innerHTML = "<p class='text-secondary'>" + chartName + " - No valid chart data structure.</p>";
+                        console.warn("No valid chart data structure for " + chartName + ":", chartData);
+                    }
+                } catch (e) {
+                    chartDiv.innerHTML = "<p class='text-danger'>Error parsing JSON or plotting " + chartName + ": " + e.message + "</p>";
+                    console.error("Error parsing JSON or plotting " + chartName + ":", e);
+                    console.error("Received JSON string was:", jsonDataString); // הדפס את ה-JSON הבעייתי
+                }
+            } else {
+                chartDiv.innerHTML = "<p class='text-secondary'>" + chartName + " - נתונים לא זמינים.</p>";
+                console.warn(chartName + " - JSON data string is null, None, or empty.");
+            }
+        }
+
+        // קריאה לפונקציות הרינדור עם ה-JSON שהועבר מהשרת
+        // ודא שהמשתנים graph_revenue_json ו-graph_net_income_json מועברים כראוי מה-render_template
+        // והם מכילים מחרוזת JSON תקינה.
+        renderPlotlyChart('revenueGraphDiv', {{ graph_revenue_json | tojson | safe if graph_revenue_json else 'null' }}, 'Revenue Graph');
+        renderPlotlyChart('netIncomeGraphDiv', {{ graph_net_income_json | tojson | safe if graph_net_income_json else 'null' }}, 'Net Income Graph');
+    </script>
 
 {% else %}
     <p class="text-warning">אנא בחר טיקר תחילה כדי לראות גרפים.</p>

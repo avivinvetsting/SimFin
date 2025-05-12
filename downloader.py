@@ -2,6 +2,56 @@
 import simfin as sf
 import pandas as pd
 import time # להשהיות
+import yfinance as yf
+
+
+#---------------------------------------------------------------------------------------------
+
+
+def download_price_history_with_mavg(ticker_symbol, period="1y", interval="1d", moving_averages=None):
+    """
+    Downloads historical price data for a ticker and calculates specified moving averages.
+
+    Args:
+        ticker_symbol (str): The stock ticker.
+        period (str): Period for historical data (e.g., "1mo", "6mo", "1y", "5y", "max").
+        interval (str): Data interval (e.g., "1d", "1wk", "1mo").
+        moving_averages (list of int, optional): List of window sizes for moving averages.
+                                                 Defaults to None (no moving averages).
+
+    Returns:
+        pd.DataFrame: DataFrame with OHLC, Volume, and calculated moving averages, or None if error.
+    """
+    print(f"downloader.py: Downloading price history for {ticker_symbol} (period: {period}, interval: {interval})")
+    try:
+        ticker = yf.Ticker(ticker_symbol)
+        hist_df = ticker.history(period=period, interval=interval)
+
+        if hist_df.empty:
+            print(f"downloader.py: No price history found for {ticker_symbol} with period {period}, interval {interval}.")
+            return None
+
+        # חישוב ממוצעים נעים אם התבקש
+        if moving_averages:
+            for ma in moving_averages:
+                if isinstance(ma, int) and ma > 0:
+                    hist_df[f'MA{ma}'] = hist_df['Close'].rolling(window=ma).mean()
+        
+        print(f"downloader.py: Price history for {ticker_symbol} downloaded and MAs calculated.")
+        return hist_df
+    except Exception as e:
+        print(f"downloader.py: Error downloading price history for {ticker_symbol}: {e}")
+        return None
+#---------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
 
 def download_financial_statements(ticker_symbol, market='us'):
     """
