@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ page_title }} - SimFin Analyzer</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js" charset="utf-8"></script>
+
     <style>
         body {
             display: flex;
@@ -21,12 +23,12 @@
             top: 56px; /* מתחת ל-navbar */
             right: 0; 
             padding-top: 20px;
-            overflow-y: auto; /* מאפשר גלילה אם התפריט ארוך */
+            overflow-y: auto; 
             border-left: 1px solid #dee2e6;
         }
         #sidebar .nav-link {
             padding: 10px 15px;
-            font-size: 1.0em; /* גודל פונט קצת יותר קטן */
+            font-size: 1.0em; 
             display: block;
             color: #333;
             border-bottom: 1px solid #eee;
@@ -53,25 +55,23 @@
             min-height: calc(100vh - 56px);
             transition: all 0.3s;
             margin-right: 250px; 
-            overflow-y: auto; /* מאפשר גלילה בתוכן */
+            overflow-y: auto; 
         }
-        .top-bar-fixed { /* שינוי ל-navbar קבוע */
+        .top-bar-fixed { 
             background-color: #e9ecef;
             padding: .5rem 1rem;
             border-bottom: 1px solid #ddd;
             position: fixed;
             top: 0;
-            right: 0; /* הצמדה לימין */
-            left: 0; /* מתיחה לכל הרוחב */
-            z-index: 1030; /* מעל התפריט צד */
-            display: flex; /* שימוש ב-flex ליישור */
-            justify-content: flex-end; /* הצמדת הטופס לימין ב-RTL */
+            right: 0; 
+            left: 0; 
+            z-index: 1030; 
+            display: flex; 
+            justify-content: flex-end; 
         }
         .top-bar-fixed .form-inline {
-             width: auto; /* מאפשר לטופס להתכווץ לתוכן שלו */
+             width: auto; 
         }
-
-        /* Flash messages styling */
         .flashes {
             list-style-type: none;
             padding-left: 0;
@@ -91,7 +91,8 @@
 <body>
     <div class="top-bar-fixed">
         <form method="POST" action="{{ url_for('route_set_ticker') }}" class="form-inline">
-            <div class="form-group mx-sm-3 mb-2 mb-sm-0"> <label for="ticker_input" class="sr-only">הזן טיקר</label>
+            <div class="form-group mx-sm-3 mb-2 mb-sm-0">
+                <label for="ticker_input" class="sr-only">הזן טיקר</label>
                 <input type="text" class="form-control form-control-sm" id="ticker_input" name="ticker_input" placeholder="טיקר (לדוגמה: AAPL)" value="{{ current_ticker if current_ticker }}">
             </div>
             <button type="submit" class="btn btn-success btn-sm mb-2 mb-sm-0">בחר מניה והורד נתונים</button>
@@ -132,7 +133,8 @@
             {% endif %}
         {% endwith %}
 
-        <h2 class="mt-4">{{ page_title }}</h2> {% if content_template %}
+        <h2 class="mt-4">{{ page_title }}</h2>
+        {% if content_template %}
             {% include content_template %}
         {% else %}
             <p>תוכן הדף יופיע כאן.</p>

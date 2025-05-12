@@ -1,16 +1,18 @@
-# SimFinFund.py
+# SimFinFund.py (עם שימוש ב-DataFrame מה-session לגרפים)
 import simfin as sf
 import pandas as pd
 import os
 from flask import Flask, render_template, request, url_for, redirect, flash, session
+import plotly.express as px
+import plotly.graph_objects as go
 
 # --- ייבוא פונקציית ההורדה ---
-from Downloader import download_financial_statements 
+from downloader import download_financial_statements 
 
-# --- הגדרות API ---
+# --- הגדרות API (כמו קודם) ---
 API_KEY_FILE = 'simfin_api_key.txt'
-
 def load_simfin_api_key():
+    # ... (כמו קודם) ...
     api_key = 'free'
     if os.path.exists(API_KEY_FILE):
         try:
@@ -29,33 +31,147 @@ def load_simfin_api_key():
 
 api_key_to_set = load_simfin_api_key()
 sf.set_api_key(api_key_to_set)
-
 simfin_data_directory = os.path.join(os.path.expanduser('~'), 'simfin_data')
 os.makedirs(simfin_data_directory, exist_ok=True) 
 sf.set_data_dir(simfin_data_directory)
 print(f"SimFinFund.py: SimFin data directory set to: {simfin_data_directory}")
-
 script_dir = os.path.dirname(os.path.abspath(__file__))
 PROCESSED_DATA_BASE_DIR = os.path.join(script_dir, 'Data')
 os.makedirs(PROCESSED_DATA_BASE_DIR, exist_ok=True)
 print(f"SimFinFund.py: Processed CSVs will be saved to: {PROCESSED_DATA_BASE_DIR}")
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your_very_secret_key_for_flask_sessions_CHANGE_ME_PLEASE' 
+app.config['SECRET_KEY'] = 'your_very_secret_key_for_flask_sessions_CHANGE_ME_PLEASE_AGAIN_AND_AGAIN' 
 
 print("SimFinFund.py: Application starting. Data will be fetched on user request via ticker input.")
 
-def get_statement_file_path(ticker, statement_type_key, variant):
-    """Constructs the expected path for a statement's CSV file."""
-    human_readable_names = {
-        'income': 'Income_Statement',
-        'balance': 'Balance_Sheet',
-        'cashflow': 'Cash_Flow_Statement'
-    }
-    file_statement_name = human_readable_names.get(statement_type_key, f"Unknown_{statement_type_key}")
-    file_name = f"{ticker}_{file_statement_name}_{variant}.csv"
-    ticker_save_dir = os.path.join(PROCESSED_DATA_BASE_DIR, ticker)
-    return os.path.join(ticker_save_dir, file_name)
+
+
+
+
+# --- פונקציית עזר ליצירת גרפים (כמו קודם, עם שיפור קטן) ---
+def create_timeseries_chart(df, y_column, title, x_column_name_in_df=None, y_axis_title=None, chart_type='bar'):
+    print(f"\n--- Attempting to create chart: '{title}' ---")
+    print(f"Input DataFrame for '{title}' (head):")
+    if df is None:
+        print("DataFrame is None.")
+        return f"<p class='text-warning'>Chart '{title}': Input DataFrame is None.</p>"
+    if df.empty:
+        print("DataFrame is empty.")
+        return f"<p class='text-warning'>Chart '{title}': Input DataFrame is empty.</p>"
+    
+    print(df.head(3)) # הדפס רק 3 שורות ראשונות
+    print(f"Index type for '{title}': {type(df.index)}")
+    if isinstance(df.index, pd.DatetimeIndex):
+        print(f"Index is DatetimeIndex. Is sorted: {df.index.is_monotonic_increasing or df.index.is_monotonic_decreasing}")
+
+    # אם האינדקס הוא התאריכים
+    x_data = None
+    x_label = None
+
+    if x_column_name_in_df is None: 
+        x_data = df.index
+        x_label = df.index.name if df.index.name else 'Date'
+        # ודא שהאינדקס הוא DatetimeIndex וממוין
+        if not isinstance(df.index, pd.DatetimeIndex):
+            print(f"Chart '{title}': Index is not DatetimeIndex, attempting conversion...")
+            try:
+                df_temp_for_chart = df.copy()
+                df_temp_for_chart.index = pd.to_datetime(df_temp_for_chart.index, errors='coerce')
+                df_temp_for_chart = df_temp_for_chart[df_temp_for_chart.index.notna()]
+                if not df_temp_for_chart.empty:
+                    df_temp_for_chart = df_temp_for_chart.sort_index()
+                    x_data = df_temp_for_chart.index
+                    df = df_temp_for_chart # עדכן את df לזה עם האינדקס המתוקן
+                    print(f"Chart '{title}': Index converted to DatetimeIndex and sorted.")
+                else:
+                    print(f"Chart '{title}': Index conversion failed or resulted in empty data. Using original index as string.")
+                    x_data = df.index.astype(str) # התייחס לאינדקס כמחרוזת אם ההמרה נכשלה
+            except Exception as e:
+                print(f"Chart '{title}': Error converting index to datetime: {e}. Using original index as string.")
+                x_data = df.index.astype(str)
+        elif not (df.index.is_monotonic_increasing or df.index.is_monotonic_decreasing):
+            print(f"Chart '{title}': DatetimeIndex is not sorted. Sorting...")
+            df = df.sort_index() # מיין אם הוא כבר DatetimeIndex אבל לא ממוין
+            x_data = df.index
+            
+    else: # שימוש בעמודה כשציר X
+        if x_column_name_in_df not in df.columns:
+            print(f"Chart '{title}': X-axis column '{x_column_name_in_df}' not in DataFrame.")
+            return f"<p class='text-danger'>Error: X-axis column '{x_column_name_in_df}' not found for chart '{title}'.</p>"
+        x_data = df[x_column_name_in_df]
+        x_label = x_column_name_in_df
+        if pd.api.types.is_datetime64_any_dtype(df[x_column_name_in_df]):
+             df = df.sort_values(by=x_column_name_in_df)
+             x_data = df[x_column_name_in_df]
+
+    if y_column not in df.columns:
+        print(f"Chart '{title}': Y-axis column '{y_column}' not in DataFrame. Available columns: {df.columns.tolist()}")
+        return f"<p class='text-danger'>Error: Column '{y_column}' not found for chart '{title}'.</p>"
+
+    # הדפס את הנתונים הספציפיים שייכנסו לגרף
+    print(f"Data for Y-axis '{y_column}' in chart '{title}' (first 5 values):")
+    print(df[y_column].head().to_string())
+    print(f"Data type of Y-axis '{y_column}': {df[y_column].dtype}")
+
+
+    try:
+        df_for_chart = df.copy()
+        # נסה להמיר את עמודת ה-Y למספר, גם אם היא כבר אמורה להיות מספרית, כדי לוודא
+        df_for_chart[y_column] = pd.to_numeric(df_for_chart[y_column], errors='coerce')
+        # הסר שורות שבהן ערך ה-Y הוא NaN לאחר ההמרה
+        df_cleaned = df_for_chart.dropna(subset=[y_column])
+        
+        if df_cleaned.empty:
+            print(f"Chart '{title}': DataFrame became empty after coercing/dropping NaNs for y-column '{y_column}'.")
+            return f"<p class='text-info'>No valid numeric data to display for '{y_column}' in chart '{title}'.</p>"
+    except Exception as e:
+        print(f"Chart '{title}': Error converting y-column '{y_column}' to numeric: {e}")
+        return f"<p class='text-danger'>Error processing numeric data for chart '{title}'.</p>"
+
+    print(f"Chart '{title}': Successfully prepared data for plotting. X data type: {type(x_data)}, Y data (cleaned) head:")
+    print(df_cleaned[[y_column]].head())
+
+
+    try:
+        if chart_type == 'bar':
+            fig = px.bar(df_cleaned, x=x_data, y=y_column, title=title,
+                           labels={y_column: y_axis_title if y_axis_title else y_column, x_label: x_label})
+        elif chart_type == 'line':
+            fig = px.line(df_cleaned, x=x_data, y=y_column, title=title,
+                            labels={y_column: y_axis_title if y_axis_title else y_column, x_label: x_label}, markers=True)
+        else: 
+            print(f"Chart '{title}': Unsupported chart type: {chart_type}")
+            return None
+        
+        fig.update_layout(yaxis_title=y_axis_title if y_axis_title else y_column, xaxis_title=x_label,
+                          yaxis_tickformat=',.0f', height=450, margin=dict(l=20, r=20, t=50, b=20))
+        
+        # אם ציר ה-X הוא תאריכי, נסה לפרמט אותו
+        if isinstance(x_data, pd.DatetimeIndex) or pd.api.types.is_datetime64_any_dtype(x_data):
+             fig.update_xaxes(tickformat='%Y-%m-%d', type='category') # 'category' יכול לעזור עם תאריכים לא רציפים או אם יש מעט נקודות
+        
+        print(f"Chart '{title}': Plotly figure created successfully.")
+        
+        #------------------------------------------------------------------------------
+        #--------------------------------------------------------------------------------
+        # ... בתוך create_timeseries_chart, לפני return fig.to_html ...
+        graph_html_output = fig.to_html(full_html=False, include_plotlyjs=False)
+        print(f"\n--- Plotly HTML for chart '{title}' ---")
+        print(graph_html_output)
+        print(f"--- End Plotly HTML for chart '{title}' ---\n")
+        return graph_html_output
+        #---------------------------------------------------------------------------------
+        #--------------------------------------------------------------------------------
+        
+        
+        
+        return fig.to_html(full_html=False, include_plotlyjs=False)
+    except Exception as e:
+        print(f"Chart '{title}': Error creating Plotly figure: {e}")
+        import traceback
+        traceback.print_exc() # הדפסת Traceback מלא של השגיאה מ-Plotly
+        return f"<p class='text-danger'>Error generating chart '{title}'. Details: {e}</p>"
 
 # --- Flask Routes ---
 @app.route('/')
@@ -80,6 +196,10 @@ def route_set_ticker():
             
             session_data_status = {} 
             any_success = False
+            # מנקה נתונים ישנים מה-session לפני טעינת חדשים
+            session.pop('income_annual_df', None)
+            session.pop('income_quarterly_df', None)
+            # (אפשר להוסיף גם למאזן ותזרים אם נשתמש בהם ישירות לגרפים)
 
             variants_to_process = ['annual', 'quarterly']
             statement_keys_to_process = ['income', 'balance', 'cashflow']
@@ -95,93 +215,149 @@ def route_set_ticker():
                     data_item = download_results.get(result_key)
                     
                     if isinstance(data_item, pd.DataFrame) and not data_item.empty:
+                        # שמירת ה-DataFrame ל-CSV (טוב לגיבוי ולבדיקה ידנית)
                         file_statement_name = human_readable_names_for_file[stmt_key]
                         file_name = f"{ticker}_{file_statement_name}_{variant}.csv"
                         ticker_save_dir = os.path.join(PROCESSED_DATA_BASE_DIR, ticker)
                         os.makedirs(ticker_save_dir, exist_ok=True)
                         save_path = os.path.join(ticker_save_dir, file_name)
                         try:
+                            if isinstance(data_item.index, pd.DatetimeIndex):
+                                data_item.index.name = data_item.index.name or 'Report Date'
                             data_item.to_csv(save_path, index=True)
                             session_data_status[result_key] = f"Saved: {os.path.basename(save_path)}"
                             any_success = True
                             print(f"SimFinFund.py: Saved {result_key} to {save_path}")
+
+                            # !!! שמירת ה-DataFrame ב-session !!!
+                            # נשמור רק את דוחות ההכנסה כרגע, כי רק אותם אנו צריכים לגרפים שהוגדרו
+                            if stmt_key == 'income':
+                                # ה-DataFrame נשמר כ-JSON כי אובייקטים מורכבים לא נשמרים ישירות ב-session
+                                session[f'{result_key}_df_json'] = data_item.to_json(orient='split', date_format='iso')
+                                print(f"SimFinFund.py: Stored {result_key}_df_json in session.")
                         except Exception as e:
-                            session_data_status[result_key] = f"Error saving CSV for {result_key}: {e}"
-                            print(f"SimFinFund.py: Error saving CSV for {result_key}: {e}")
+                            session_data_status[result_key] = f"Error saving CSV/session for {result_key}: {e}"
+                            print(f"SimFinFund.py: Error saving CSV/session for {result_key}: {e}")
                     elif isinstance(data_item, dict) and "Error" in data_item:
                         session_data_status[result_key] = f"Error downloading {result_key}: {data_item['Details']}"
-                        print(f"SimFinFund.py: {session_data_status[result_key]}")
                     else: 
                         session_data_status[result_key] = f"No data or unexpected format for {result_key}."
-                        print(f"SimFinFund.py: {session_data_status[result_key]}")
             
             session['data_download_status'] = session_data_status
 
             if any_success:
-                flash(f"נתונים עבור {ticker} הורדו ונשמרו (או נוסו להורדה).", "success")
+                flash(f"נתונים עבור {ticker} הורדו (או נוסו להורדה).", "success")
             else:
-                flash(f"הורדת הנתונים עבור {ticker} נכשלה. בדוק את הלוגים בשרת והודעות סטטוס.", "danger")
+                flash(f"הורדת הנתונים עבור {ticker} נכשלה. בדוק לוגים והודעות סטטוס.", "danger")
             
             return redirect(url_for('route_graphs_annual')) 
         else:
             flash("לא הוזן טיקר.", "warning")
     return redirect(url_for('route_home'))
 
-def get_data_for_page(current_ticker, variant, statement_key_for_data):
-    """Helper to load data for display pages from CSV."""
-    file_path = get_statement_file_path(current_ticker, statement_key_for_data, variant)
+def get_dataframe_from_session_or_csv(ticker, variant, statement_key):
+    """
+    Tries to load DataFrame from session. If not found, tries from CSV.
+    """
+    session_key = f"{statement_key}_{variant}_df_json"
     df = None
     error_message = None
     info_message = None
-    
-    if os.path.exists(file_path):
+
+    # נסה לטעון מה-session
+    if session_key in session:
         try:
-            df = pd.read_csv(file_path, index_col=0) 
-            if df.empty:
-                info_message = f"קובץ הנתונים ({os.path.basename(file_path)}) נמצא אך הוא ריק."
-                df = None 
+            df_json = session[session_key]
+            df = pd.read_json(df_json, orient='split', convert_dates=['index']) # המרת אינדקס התאריכים
+            df = df.sort_index()
+            if not df.empty:
+                info_message = f"Data for {statement_key} ({variant}) loaded from session."
+                print(f"SimFinFund.py: Loaded {session_key} from session.")
+            else:
+                info_message = f"Data for {statement_key} ({variant}) from session is empty."
+                df = None # התייחס כאל לא נטען
         except Exception as e:
-            error_message = f"שגיאה בקריאת קובץ נתונים ({os.path.basename(file_path)}): {e}"
-    else:
-        error_message = f"קובץ נתונים ({os.path.basename(file_path)}) עבור {current_ticker} ({variant}) לא נמצא. "
-        error_message += "אנא בצע 'בחר מניה והמשך' כדי להוריד נתונים."
-        download_status = session.get('data_download_status', {}).get(f"{statement_key_for_data}_{variant}")
-        if download_status:
-            error_message += f" (סטטוס הורדה: {download_status})"
-            
+            error_message = f"Error loading {statement_key} ({variant}) from session: {e}. Will try CSV."
+            print(f"SimFinFund.py: {error_message}")
+            session.pop(session_key, None) # הסר מה-session אם הוא פגום
+
+    # אם לא הצליח מה-session, נסה לטעון מה-CSV
+    if df is None: # או אם df התקבל ריק מהסשן
+        file_path = get_statement_file_path(ticker, statement_key, variant)
+        print(f"SimFinFund.py: Attempting to load {statement_key} ({variant}) from CSV: {file_path}")
+        if os.path.exists(file_path):
+            try:
+                df = pd.read_csv(file_path, index_col=0)
+                if not isinstance(df.index, pd.DatetimeIndex):
+                    df.index = pd.to_datetime(df.index, errors='coerce')
+                    df = df[df.index.notna()].sort_index()
+                
+                if not df.empty:
+                    info_message = info_message or f"Data for {statement_key} ({variant}) loaded from CSV: {os.path.basename(file_path)}"
+                    # אופציונלי: טען מחדש ל-session לשימוש עתידי בבקשות אחרות
+                    session[session_key] = df.to_json(orient='split', date_format='iso')
+                else:
+                    info_message = info_message or f"CSV file ({os.path.basename(file_path)}) for {statement_key} ({variant}) is empty."
+                    df = None
+            except Exception as e:
+                error_message = (error_message or "") + f" Error reading CSV {file_path}: {e}"
+        elif not error_message: # אם הקובץ לא קיים ואין שגיאה קודמת מהסשן
+             error_message = f"CSV file for {statement_key} ({variant}) not found for ticker {ticker}."
+             download_status = session.get('data_download_status', {}).get(f"{statement_key}_{variant}")
+             if download_status: error_message += f" (Download status: {download_status})"
+    
     return df, error_message, info_message
+
 
 @app.route('/graphs/annual')
 def route_graphs_annual():
     current_ticker = session.get('current_ticker', None)
-    api_key_status = get_api_key_status_for_display()
+    api_key_status = get_api_key_status_for_display() 
     page_title = 'גרפים שנתיים'
     if not current_ticker:
         flash("אנא בחר טיקר תחילה.", "warning")
         return redirect(url_for('route_home'))
     
     page_title = f'גרפים שנתיים עבור {current_ticker}'
-    df_income, error_msg, info_msg = get_data_for_page(current_ticker, 'annual', 'income')
-
-    graph_html_content = "<h4>נתוני דוח הכנסות (שנתי) - דוגמה:</h4>"
-    if error_msg:
-        graph_html_content = f"<p class='text-danger'>{error_msg}</p>"
-    elif info_msg:
-         graph_html_content = f"<p class='text-info'>{info_msg}</p>"
-    elif df_income is not None:
-        graph_html_content += f"<p>סה\"כ רשומות בדוח הכנסות שנתי: {len(df_income)}</p>"
-        # כאן תוסיף לוגיקה ליצירת גרפים עם Plotly/Matplotlib מ-df_income
-        graph_html_content += "<p><i>(בקרוב: גרף הכנסות ורווח נקי)</i></p>"
-        graph_html_content += df_income.tail(3).to_html(classes='table table-sm table-bordered', border=0, index=True) # הצגת 3 שורות אחרונות
+    
+    # !!! טעינת DataFrame מדוח הכנסות שנתי מה-session או מ-CSV !!!
+    df_income, error_msg_data, info_msg_data = get_dataframe_from_session_or_csv(current_ticker, 'annual', 'income')
+    
+    print(f"--- Data for Annual Graphs (Ticker: {current_ticker}) ---")
+    if df_income is not None:
+        print("Annual Income Statement DataFrame (head for graph):")
+        print(df_income.head())
+        print(f"Columns available: {df_income.columns.tolist()}")
+        print(f"Index type: {type(df_income.index)}")
     else:
-        graph_html_content += "<p>לא נטענו נתוני דוח הכנסות להצגת גרפים.</p>"
+        print(f"Annual Income Statement DataFrame is None. Error: {error_msg_data}, Info: {info_msg_data}")
+    print("----------------------------------------------------")
+
+    graph_revenue_html = None
+    graph_net_income_html = None
+    
+    if df_income is not None and not df_income.empty:
+        # נשתמש ב-'Net Income (Common)' אם קיים, אחרת ננסה 'Net Income'
+        net_income_col_name = 'Net Income (Common)' 
+        revenue_col_name = 'Revenue'
+
+        graph_revenue_html = create_timeseries_chart(df_income, 
+                                                    y_column=revenue_col_name, 
+                                                    title=f'הכנסות (Revenue) - שנתי',
+                                                    y_axis_title='סכום', chart_type='bar')
+
+        graph_net_income_html = create_timeseries_chart(df_income, 
+                                                        y_column=net_income_col_name, 
+                                                        title=f'רווח נקי ({net_income_col_name}) - שנתי',
+                                                        y_axis_title='סכום', chart_type='bar')
+    elif not error_msg_data and not info_msg_data : 
+        error_msg_data = "לא נטענו נתוני דוח הכנסות להצגת גרפים."
         
     return render_template('base_layout.html', 
-                           page_title=page_title,
-                           current_ticker=current_ticker,
-                           content_template='content_graphs.html',
-                           graph_type='Annual',
-                           graph_content_for_template = graph_html_content,
+                           page_title=page_title, current_ticker=current_ticker,
+                           content_template='content_graphs.html', graph_type='Annual',
+                           graph_revenue_html=graph_revenue_html, graph_net_income_html=graph_net_income_html,
+                           data_error_message=error_msg_data, data_info_message=info_msg_data,   
                            api_key_status_display=api_key_status)
 
 @app.route('/graphs/quarterly')
@@ -194,29 +370,60 @@ def route_graphs_quarterly():
         return redirect(url_for('route_home'))
 
     page_title = f'גרפים רבעוניים עבור {current_ticker}'
-    df_income_q, error_msg_q, info_msg_q = get_data_for_page(current_ticker, 'quarterly', 'income')
     
-    graph_html_content = "<h4>נתוני דוח הכנסות (רבעוני) - דוגמה:</h4>"
-    if error_msg_q:
-        graph_html_content = f"<p class='text-danger'>{error_msg_q}</p>"
-    elif info_msg_q:
-        graph_html_content = f"<p class='text-info'>{info_msg_q}</p>"
-    elif df_income_q is not None:
-        graph_html_content += f"<p>סה\"כ רשומות בדוח הכנסות רבעוני: {len(df_income_q)}</p>"
-        graph_html_content += "<p><i>(בקרוב: גרף הכנסות ורווח נקי)</i></p>"
-        graph_html_content += df_income_q.tail(3).to_html(classes='table table-sm table-bordered', border=0, index=True)
+    # !!! טעינת DataFrame מדוח הכנסות רבעוני מה-session או מ-CSV !!!
+    df_income_q, error_msg_data_q, info_msg_data_q = get_dataframe_from_session_or_csv(current_ticker, 'quarterly', 'income')
+
+    print(f"--- Data for Quarterly Graphs (Ticker: {current_ticker}) ---")
+    if df_income_q is not None:
+        print("Quarterly Income Statement DataFrame (head for graph):")
+        print(df_income_q.head())
+        print(f"Columns available: {df_income_q.columns.tolist()}")
+        print(f"Index type: {type(df_income_q.index)}")
     else:
-        graph_html_content += "<p>לא נטענו נתוני דוח הכנסות להצגת גרפים.</p>"
+        print(f"Quarterly Income Statement DataFrame is None. Error: {error_msg_data_q}, Info: {info_msg_data_q}")
+    print("----------------------------------------------------")
+
+    graph_revenue_html_q = None
+    graph_net_income_html_q = None
+
+    if df_income_q is not None and not df_income_q.empty:
+        net_income_col_name = 'Net Income (Common)' if 'Net Income (Common)' in df_income_q.columns else 'Net Income'
+        revenue_col_name = 'Revenue'
+        
+        graph_revenue_html_q = create_timeseries_chart(df_income_q, 
+                                                      y_column=revenue_col_name, 
+                                                      title=f'הכנסות (Revenue) - רבעוני',
+                                                      y_axis_title='סכום', chart_type='bar')
+
+        graph_net_income_html_q = create_timeseries_chart(df_income_q, 
+                                                         y_column=net_income_col_name, 
+                                                         title=f'רווח נקי ({net_income_col_name}) - רבעוני',
+                                                         y_axis_title='סכום', chart_type='bar')
+    elif not error_msg_data_q and not info_msg_data_q:
+        error_msg_data_q = "לא נטענו נתוני דוח הכנסות להצגת גרפים."
         
     return render_template('base_layout.html', 
-                           page_title=page_title,
-                           current_ticker=current_ticker,
-                           content_template='content_graphs.html',
-                           graph_type='Quarterly',
-                           graph_content_for_template = graph_html_content,
+                           page_title=page_title, current_ticker=current_ticker,
+                           content_template='content_graphs.html', graph_type='Quarterly',
+                           graph_revenue_html=graph_revenue_html_q, graph_net_income_html=graph_net_income_html_q,  
+                           data_error_message=error_msg_data_q, data_info_message=info_msg_data_q,
                            api_key_status_display=api_key_status)
 
-@app.route('/valuations')
+# ... (route_valuations ו- route_update_api_key_action כמו קודם) ...
+def get_api_key_status_for_display(): # ודא שהפונקציה הזו מוגדרת כראוי
+    # ... (כמו קודם) ...
+    if os.path.exists(API_KEY_FILE) and os.path.getsize(API_KEY_FILE) > 0:
+        with open(API_KEY_FILE, 'r') as f:
+            key_in_file = f.read().strip()
+        if key_in_file.lower() == 'free':
+             return "משתמש במפתח 'free' מהקובץ."
+        else:
+             return "מפתח API מותאם אישית נטען מהקובץ."
+    else:
+        return "קובץ מפתח לא קיים או ריק, משתמש ב-'free' כברירת מחדל."
+
+@app.route('/valuations') # ודא שכל ה-routes מוגדרים
 def route_valuations():
     current_ticker = session.get('current_ticker', None)
     api_key_status = get_api_key_status_for_display()
@@ -226,20 +433,9 @@ def route_valuations():
                            content_template='content_valuations.html',
                            api_key_status_display=api_key_status)
 
-def get_api_key_status_for_display():
-    """Helper function to get the API key status string for display."""
-    if os.path.exists(API_KEY_FILE) and os.path.getsize(API_KEY_FILE) > 0:
-        with open(API_KEY_FILE, 'r') as f:
-            key_in_file = f.read().strip()
-        if key_in_file.lower() == 'free':
-            return "משתמש במפתח 'free' מהקובץ."
-        else:
-            return "מפתח API מותאם אישית נטען מהקובץ."
-    else:
-        return "קובץ מפתח לא קיים או ריק, משתמש ב-'free' כברירת מחדל."
-
-@app.route('/update_api_key_action', methods=['POST']) # שינוי שם ה-route למניעת התנגשות
+@app.route('/update_api_key_action', methods=['POST'])
 def route_update_api_key_action():
+    # ... (כמו קודם) ...
     if request.method == 'POST':
         new_api_key = request.form.get('api_key_input_modal', '').strip()
         try:
@@ -262,13 +458,13 @@ def route_update_api_key_action():
                 flash('מפתח API נמחק/נוקה. האפליקציה תשתמש כעת בנתוני "free".', 'info')
                 print(f"SimFinFund.py: API key cleared. Using 'free' data.")
         except Exception as e:
-            session['api_key_status_display'] = f"שגיאה בעדכון: {e}" # עדכון ה-session גם במקרה של שגיאה
+            session['api_key_status_display'] = f"שגיאה בעדכון: {e}" 
             flash(f'שגיאה בעדכון מפתח API: {e}', 'danger')
             print(f"SimFinFund.py: Error updating API key: {e}")
         
         return redirect(request.referrer or url_for('route_home'))
-    # GET requests to this URL are not expected.
     return redirect(url_for('route_home'))
+
 
 if __name__ == '__main__':
     app.run(debug=True)

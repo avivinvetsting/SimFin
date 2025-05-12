@@ -1,14 +1,30 @@
 {% if current_ticker %}
-    <p>כאן יוצגו גרפים ({{ graph_type }}) עבור הטיקר: <strong>{{ current_ticker }}</strong>.</p>
+    <p>גרפים ({{ graph_type }}) עבור הטיקר: <strong>{{ current_ticker }}</strong>.</p>
     
-    {% if error_message_for_template %}
-        <div class="alert alert-warning">{{ error_message_for_template }}</div>
+    {% if data_error_message %}
+        <div class="alert alert-danger mt-3">{{ data_error_message }}</div>
+    {% endif %}
+    {% if data_info_message %}
+        <div class="alert alert-info mt-3">{{ data_info_message }}</div>
     {% endif %}
 
-    {% if graph_content_for_template %}
-        <div>{{ graph_content_for_template | safe }}</div>
-    {% else %}
-        <p>אין תוכן גרפים להצגה כרגע.</p>
+    <div class="row mt-3">
+        <div class="col-lg-6 mb-4" style="border: 1px solid lightgray; padding: 5px;"> <h5>גרף הכנסות</h5> {% if graph_revenue_html %}
+                {{ graph_revenue_html | safe }}
+            {% elif not data_error_message and not data_info_message %} 
+                <div class="alert alert-secondary">גרף הכנסות לא זמין או אין נתונים.</div>
+            {% endif %}
+        </div>
+        <div class="col-lg-6 mb-4" style="border: 1px solid lightgray; padding: 5px;"> <h5>גרף רווח נקי</h5> {% if graph_net_income_html %}
+                {{ graph_net_income_html | safe }}
+            {% elif not data_error_message and not data_info_message %}
+                <div class="alert alert-secondary">גרף רווח נקי לא זמין או אין נתונים.</div>
+            {% endif %}
+        </div>
+    </div>
+    
+    {% if not graph_revenue_html and not graph_net_income_html and not data_error_message and not data_info_message %}
+         <p class="mt-3">לא נוצרו גרפים. בדוק אם קיימים נתונים או אם יש שגיאות בטעינתם.</p>
     {% endif %}
 
 {% else %}

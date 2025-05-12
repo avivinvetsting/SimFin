@@ -6,7 +6,12 @@
     <h4 class="mt-4">סטטוס הורדת נתונים אחרונה (עבור {{ session.get('current_ticker', 'לא נבחר טיקר') }}):</h4>
     <ul class="list-group">
         {% for key, status in session.get('data_download_status', {}).items() %}
-            <li class="list-group-item {% if 'Error' in status %}list-group-item-danger{% elif 'NoDataFound' in status or 'empty' in status %}list-group-item-warning{% else %}list-group-item-success{% endif %}">
+            <li class="list-group-item 
+                {% if 'Error' in status or 'Failed' in status or 'unexpected format' in status %}list-group-item-danger
+                {% elif 'NoDataFound' in status or 'empty' in status %}list-group-item-warning
+                {% elif 'Saved' in status %}list-group-item-success
+                {% else %}list-group-item-light
+                {% endif %}">
                 <strong>{{ key.replace('_', ' ') | title }}:</strong> {{ status }}
             </li>
         {% endfor %}
