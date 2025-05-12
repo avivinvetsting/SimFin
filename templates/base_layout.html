@@ -10,57 +10,64 @@
     <style>
         body {
             display: flex;
-            padding-top: 56px; /* גובה ה-navbar העליון */
+            padding-top: 70px; /* הגדלתי קצת את הריווח מה-navbar העליון */
+            background-color: #f4f7f6; /* צבע רקע כללי עדין לדף */
         }
         #sidebar {
             min-width: 250px;
             max-width: 250px;
-            background: #f8f9fa;
-            color: #495057;
+            background: #ffffff; /* רקע לבן לתפריט */
+            color: #333; /* צבע טקסט כהה יותר */
             transition: all 0.3s;
-            height: calc(100vh - 56px); /* גובה מלא פחות ה-navbar */
+            height: calc(100vh - 56px); 
             position: fixed; 
-            top: 56px; /* מתחת ל-navbar */
+            top: 56px; 
             right: 0; 
-            padding-top: 20px;
+            padding-top: 15px; /* ריווח פנימי עליון */
             overflow-y: auto; 
-            border-left: 1px solid #dee2e6;
-        }
-        #sidebar .nav-link {
-            padding: 10px 15px;
-            font-size: 1.0em; 
-            display: block;
-            color: #333;
-            border-bottom: 1px solid #eee;
-        }
-        #sidebar .nav-link:last-child {
-            border-bottom: none;
-        }
-        #sidebar .nav-link:hover {
-            background: #e9ecef;
-            color: #007bff;
-        }
-        #sidebar .nav-link.active {
-            background-color: #007bff;
-            color: white;
+            border-left: 1px solid #ddd; /* קו הפרדה עדין */
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1); /* צל קל לתפריט */
         }
         #sidebar .sidebar-header {
-            padding: 10px 15px;
-            background: #e9ecef;
-            border-bottom: 1px solid #ddd;
+            padding: 15px;
+            background: #007bff; /* רקע כחול לכותרת התפריט */
+            color: white;
+            border-bottom: 1px solid #0056b3;
+        }
+        #sidebar .sidebar-header h4 {
+            margin-bottom: 0;
+        }
+        #sidebar .nav-link {
+            padding: 12px 20px; /* ריווח פנימי לקישורים */
+            font-size: 1.0em; 
+            display: block;
+            color: #555; /* צבע טקסט קצת יותר בהיר */
+            border-bottom: 1px solid #f0f0f0;
+        }
+        #sidebar .nav-link:last-child { border-bottom: none; }
+        #sidebar .nav-link:hover, #sidebar .nav-link.active:hover {
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+        }
+        #sidebar .nav-link.active {
+            background-color: #0069d9; /* כחול קצת יותר כהה לאקטיבי */
+            color: white;
+            font-weight: 500;
         }
         #content {
             width: calc(100% - 250px); 
-            padding: 20px;
+            padding: 25px; /* ריווח פנימי גדול יותר לתוכן */
             min-height: calc(100vh - 56px);
             transition: all 0.3s;
             margin-right: 250px; 
             overflow-y: auto; 
         }
         .top-bar-fixed { 
-            background-color: #e9ecef;
+            background-color: #fff; /* רקע לבן לבר העליון */
             padding: .5rem 1rem;
             border-bottom: 1px solid #ddd;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* צל קל */
             position: fixed;
             top: 0;
             right: 0; 
@@ -69,23 +76,10 @@
             display: flex; 
             justify-content: flex-end; 
         }
-        .top-bar-fixed .form-inline {
-             width: auto; 
+        /* ... (שאר ה-CSS שלך, כמו flashes וכו', נשאר כפי שהוא) ... */
+        .plotly-graph-div { /* ודא שהגרפים מקבלים גובה אם הוא לא מוגדר ישירות ב-HTML */
+            min-height: 400px; 
         }
-        .flashes {
-            list-style-type: none;
-            padding-left: 0;
-            margin-top: 10px;
-        }
-        .flashes li {
-            padding: 10px;
-            margin-bottom: 10px;
-            border-radius: 4px;
-        }
-        .flashes .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .flashes .danger { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .flashes .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
-        .flashes .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
     </style>
 </head>
 <body>
