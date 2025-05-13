@@ -24,32 +24,32 @@ def load_simfin_api_key():
                 read_key = f.read().strip()
             if read_key:
                 api_key = read_key
-                print("SimFinFund.py: API key loaded from file.")
-            else:
-                print(f"SimFinFund.py: API key file is empty. Using 'free'.")
+                # print("SimFinFund.py: API key loaded from file.") # הוסר
+            # else: # הוסר
+                # print(f"SimFinFund.py: API key file is empty. Using 'free'.") # הוסר
         except IOError:
-            print(f"SimFinFund.py: Could not read API key file. Using 'free'.")
-    else:
-        print(f"SimFinFund.py: API key file not found. Using 'free'.")
+            print(f"SimFinFund.py: Could not read API key file. Using 'free'.") # נשאר - מידע חשוב
+    # else: # הוסר
+        # print(f"SimFinFund.py: API key file not found. Using 'free'.") # הוסר
     return api_key
 
 api_key_to_set = load_simfin_api_key()
 sf.set_api_key(api_key_to_set)
 
 simfin_data_directory = os.path.join(os.path.expanduser('~'), 'simfin_data')
-os.makedirs(simfin_data_directory, exist_ok=True) 
+os.makedirs(simfin_data_directory, exist_ok=True)
 sf.set_data_dir(simfin_data_directory)
-print(f"SimFinFund.py: SimFin data directory set to: {simfin_data_directory}")
+# print(f"SimFinFund.py: SimFin data directory set to: {simfin_data_directory}") # הוסר
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 PROCESSED_DATA_BASE_DIR = os.path.join(script_dir, 'Data')
 os.makedirs(PROCESSED_DATA_BASE_DIR, exist_ok=True)
-print(f"SimFinFund.py: Processed CSVs will be saved to: {PROCESSED_DATA_BASE_DIR}")
+# print(f"SimFinFund.py: Processed CSVs will be saved to: {PROCESSED_DATA_BASE_DIR}") # הוסר
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your_very_secret_key_for_flask_sessions_CHANGE_ME_PLEASE_FINAL' 
+app.config['SECRET_KEY'] = 'your_very_secret_key_for_flask_sessions_CHANGE_ME_PLEASE_FINAL'
 
-print("SimFinFund.py: Application starting. Data will be fetched on user request via ticker input.")
+# print("SimFinFund.py: Application starting. Data will be fetched on user request via ticker input.") # הוסר
 
 # --- פונקציות עזר ---
 def get_statement_file_path(ticker, statement_type_key, variant):
@@ -70,37 +70,22 @@ def get_api_key_status_for_display():
 
 # --- פונקציות ליצירת גרפים ---
 
-# SimFinFund.py (פונקציית create_timeseries_chart מתוקנת במלואה)
-
-# ... (imports קיימים: import pandas as pd, import plotly.express as px, import json, import plotly.utils) ...
-
-# SimFinFund.py (ודא שזו הפונקציה שנמצאת אצלך)
-
-# ... (imports קיימים: import pandas as pd, import plotly.express as px, import json, import plotly.utils) ...
-
 def create_timeseries_chart(df, y_column, title, x_column_name_in_df=None, y_axis_title=None, chart_type='bar'):
     """
     Creates a time series chart (bar or line) using Plotly Express.
     Assumes the DataFrame's index is DatetimeIndex if x_column_name_in_df is None.
     Returns a dictionary for Plotly JSON rendering or an error dictionary.
     """
-    print(f"\n--- Attempting to create chart: '{title}' ---") # הדפסה ראשית
+    # print(f"\n--- Attempting to create chart: '{title}' ---") # הוסר
     if df is None or df.empty:
-        print(f"DataFrame is empty for chart '{title}'")
+        # print(f"DataFrame is empty for chart '{title}'") # הוסר
         return {"error": f"No data available to create chart: {title} (DataFrame is None or empty)."}
-    
-    # אם אתה רוצה לראות את הנתונים הנכנסים, הסר את ההערות מהשורות הבאות:
-    # print(f"Input DataFrame for '{title}' (first 3 rows):")
-    # print(df.head(3))
-    # print(f"Index type for '{title}': {type(df.index)}")
-    # if isinstance(df.index, pd.DatetimeIndex):
-    #     print(f"Index is DatetimeIndex. Is sorted: {df.index.is_monotonic_increasing or df.index.is_monotonic_decreasing}")
 
     x_data = None
     x_label = None
-    df_for_plotting = df.copy() 
+    df_for_plotting = df.copy()
 
-    if x_column_name_in_df is None: 
+    if x_column_name_in_df is None:
         x_data = df_for_plotting.index
         x_label = df_for_plotting.index.name if df_for_plotting.index.name else 'Date'
         if not isinstance(df_for_plotting.index, pd.DatetimeIndex):
@@ -111,16 +96,16 @@ def create_timeseries_chart(df, y_column, title, x_column_name_in_df=None, y_axi
                     df_for_plotting = df_for_plotting.sort_index()
                     x_data = df_for_plotting.index
                 else:
-                    x_data = df.index.astype(str) 
-                    df_for_plotting = df.copy() 
+                    x_data = df.index.astype(str)
+                    df_for_plotting = df.copy()
             except Exception as e:
                 x_data = df.index.astype(str)
                 df_for_plotting = df.copy()
         elif not (df_for_plotting.index.is_monotonic_increasing or df_for_plotting.index.is_monotonic_decreasing):
             df_for_plotting = df_for_plotting.sort_index()
             x_data = df_for_plotting.index
-            
-    else: 
+
+    else:
         if x_column_name_in_df not in df_for_plotting.columns:
             return {"error": f"X-axis column '{x_column_name_in_df}' not found for chart '{title}'."}
         x_data = df_for_plotting[x_column_name_in_df]
@@ -144,36 +129,35 @@ def create_timeseries_chart(df, y_column, title, x_column_name_in_df=None, y_axi
         final_x_data = df_cleaned.index
     else:
         final_x_data = df_cleaned[x_column_name_in_df]
-    
+
     try:
         if chart_type == 'bar':
             fig = px.bar(df_cleaned, x=final_x_data, y=y_column, title=title,
-                           labels={y_column: y_axis_title if y_axis_title else y_column, 
+                           labels={y_column: y_axis_title if y_axis_title else y_column,
                                    x_label: x_label})
-            # אין פרמטר markers לפונקציה px.bar
         elif chart_type == 'line':
             fig = px.line(df_cleaned, x=final_x_data, y=y_column, title=title,
-                            labels={y_column: y_axis_title if y_axis_title else y_column, 
-                                    x_label: x_label}, 
-                            markers=True) # הפרמטר markers תקין כאן
-        else: 
+                            labels={y_column: y_axis_title if y_axis_title else y_column,
+                                    x_label: x_label},
+                            markers=True)
+        else:
             return {"error": f"Unsupported chart type: {chart_type}"}
-        
-        fig.update_layout(yaxis_title=y_axis_title if y_axis_title else y_column, 
+
+        fig.update_layout(yaxis_title=y_axis_title if y_axis_title else y_column,
                           xaxis_title=x_label,
                           yaxis_tickformat=',.0f', height=450, margin=dict(l=40, r=20, t=60, b=40))
-        
+
         if pd.api.types.is_datetime64_any_dtype(final_x_data):
              fig.update_xaxes(tickformat='%Y-%m-%d', type='category')
-        
-        print(f"Chart '{title}': Plotly figure object created successfully.") # הדפסה חשובה
+
+        # print(f"Chart '{title}': Plotly figure object created successfully.") # הוסר
         chart_json_output = {"data": fig.data, "layout": fig.layout}
         return chart_json_output
 
     except Exception as e:
-        print(f"Chart '{title}': Error creating Plotly figure object: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"Chart '{title}': Error creating Plotly figure object: {e}") # נשאר - מידע שגיאה חשוב
+        # import traceback # הוסר
+        # traceback.print_exc() # הוסר
         return {"error": f"Error generating chart '{title}'. Details: {e}"}
 
 
@@ -192,7 +176,7 @@ def create_candlestick_chart_with_mavg(df_prices, ticker_symbol, moving_averages
                           xaxis_rangeslider_visible=False, height=600, legend_title_text='מקרא')
         return {"data": fig.data, "layout": fig.layout}
     except Exception as e:
-        print(f"Error creating candlestick chart for {ticker_symbol}: {e}")
+        print(f"Error creating candlestick chart for {ticker_symbol}: {e}") # נשאר - מידע שגיאה חשוב
         return {"error": f"Error generating candlestick chart: {e}"}
 
 # --- Flask Routes ---
@@ -204,10 +188,10 @@ def route_home():
     price_error = None
 
     if current_ticker:
-        print(f"route_home: Current ticker is {current_ticker}. Fetching price history...")
+        # print(f"route_home: Current ticker is {current_ticker}. Fetching price history...") # הוסר
         moving_averages_config = [20, 50, 100, 150, 200]
-        df_prices = download_price_history_with_mavg(current_ticker, period="1y", interval="1d", moving_averages=moving_averages_config)
-        
+        df_prices = download_price_history_with_mavg(current_ticker, period="10y", interval="1d", moving_averages=moving_averages_config)
+
         if df_prices is not None and not df_prices.empty:
             ma_cols_to_plot = [f'MA{ma}' for ma in moving_averages_config if f'MA{ma}' in df_prices.columns]
             chart_data = create_candlestick_chart_with_mavg(df_prices, current_ticker, ma_cols_to_plot)
@@ -217,13 +201,13 @@ def route_home():
                 price_error = chart_data["error"]
         else:
             price_error = f"לא נמצאו נתוני מחירים עבור {current_ticker} או שגיאה בהורדה."
-            print(f"route_home: {price_error}")
+            # print(f"route_home: {price_error}") # הוסר, המשתמש יראה הודעה מתאימה
             
-    return render_template('base_layout.html', 
-                           page_title='ניתוח מניות - דף הבית', 
+    return render_template('base_layout.html',
+                           page_title='ניתוח מניות - דף הבית',
                            current_ticker=current_ticker,
                            content_template='content_home.html',
-                           candlestick_chart_json=chart_json, # שונה לשם זה
+                           candlestick_chart_json=chart_json,
                            price_data_error=price_error,
                            api_key_status_display=api_key_status)
 
@@ -233,11 +217,11 @@ def route_set_ticker():
         ticker = request.form.get('ticker_input', '').upper()
         if ticker:
             session['current_ticker'] = ticker
-            print(f"SimFinFund.py: Ticker set to {ticker}. Attempting to download financial data...")
+            # print(f"SimFinFund.py: Ticker set to {ticker}. Attempting to download financial data...") # הוסר
             download_results = download_financial_statements(ticker_symbol=ticker)
-            session_data_status = {} 
+            session_data_status = {}
             any_success = False
-            session.pop('income_annual_df_json', None) # נקה נתונים ישנים מהסשן
+            session.pop('income_annual_df_json', None)
             session.pop('income_quarterly_df_json', None)
             # (אפשר להוסיף גם למאזן ותזרים אם נשתמש בהם ישירות לגרפים)
 
@@ -246,7 +230,6 @@ def route_set_ticker():
                     result_key = f"{stmt_key}_{variant}"
                     data_item = download_results.get(result_key)
                     if isinstance(data_item, pd.DataFrame) and not data_item.empty:
-                        # שמירה ל-CSV
                         human_readable_names = {'income': 'Income_Statement', 'balance': 'Balance_Sheet', 'cashflow': 'Cash_Flow_Statement'}
                         file_name = f"{ticker}_{human_readable_names[stmt_key]}_{variant}.csv"
                         ticker_save_dir = os.path.join(PROCESSED_DATA_BASE_DIR, ticker)
@@ -261,12 +244,13 @@ def route_set_ticker():
                                 session[f'{result_key}_df_json'] = data_item.to_json(orient='split', date_format='iso')
                         except Exception as e:
                             session_data_status[result_key] = f"Error saving CSV/session: {e}"
+                            print(f"Error saving {result_key} for {ticker} to CSV/session: {e}") # נשאר - שגיאה חשובה
                     elif isinstance(data_item, dict) and "Error" in data_item:
                         session_data_status[result_key] = f"Download Error: {data_item['Details']}"
                     else: session_data_status[result_key] = f"No data for {result_key}."
             session['data_download_status'] = session_data_status
             flash(f"Data for {ticker} processed." if any_success else f"Failed to process data for {ticker}.", "success" if any_success else "danger")
-            return redirect(url_for('route_home')) # נפנה לדף הבית כדי שיראה את גרף הנרות
+            return redirect(url_for('route_home'))
         else:
             flash("לא הוזן טיקר.", "warning")
     return redirect(url_for('route_home'))
@@ -287,7 +271,7 @@ def get_dataframe_from_session_or_csv(ticker, variant, statement_key):
                 df = pd.read_csv(file_path, index_col=0)
                 if not isinstance(df.index, pd.DatetimeIndex): df.index = pd.to_datetime(df.index, errors='coerce')
                 df = df[df.index.notna()].sort_index()
-                if not df.empty: 
+                if not df.empty:
                     info_message = (info_message or "") + f" Data loaded from CSV: {os.path.basename(file_path)}"
                     session[session_key] = df.to_json(orient='split', date_format='iso') # טען מחדש לסשן
                 else: info_message = (info_message or "") + f" CSV file is empty."; df = None
@@ -300,7 +284,7 @@ def route_graphs_annual():
     current_ticker = session.get('current_ticker')
     api_key_status = get_api_key_status_for_display()
     if not current_ticker: flash("אנא בחר טיקר תחילה.", "warning"); return redirect(url_for('route_home'))
-    
+
     df_income, error_data, info_data = get_dataframe_from_session_or_csv(current_ticker, 'annual', 'income')
     graph_revenue_json, graph_net_income_json = None, None
     if df_income is not None and not df_income.empty:
@@ -309,11 +293,11 @@ def route_graphs_annual():
         chart_rev = create_timeseries_chart(df_income, revenue_col, 'הכנסות (Revenue) - שנתי', y_axis_title='סכום')
         if chart_rev and "error" not in chart_rev: graph_revenue_json = json.dumps(chart_rev, cls=plotly.utils.PlotlyJSONEncoder)
         else: error_data = (error_data or "") + (chart_rev["error"] if chart_rev else " Chart error.")
-        
+
         chart_ni = create_timeseries_chart(df_income, net_income_col, f'רווח נקי ({net_income_col}) - שנתי', y_axis_title='סכום')
         if chart_ni and "error" not in chart_ni: graph_net_income_json = json.dumps(chart_ni, cls=plotly.utils.PlotlyJSONEncoder)
         else: error_data = (error_data or "") + (chart_ni["error"] if chart_ni else " Chart error.")
-            
+
     return render_template('base_layout.html', page_title=f'גרפים שנתיים - {current_ticker}', current_ticker=current_ticker,
                            content_template='content_graphs.html', graph_type='Annual',
                            graph_revenue_json=graph_revenue_json, graph_net_income_json=graph_net_income_json,
@@ -345,10 +329,9 @@ def route_graphs_quarterly():
 
 @app.route('/valuations')
 def route_valuations():
-    # ... (כמו קודם) ...
     current_ticker = session.get('current_ticker', None)
     api_key_status = get_api_key_status_for_display()
-    return render_template('base_layout.html', 
+    return render_template('base_layout.html',
                            page_title='הערכות שווי',
                            current_ticker=current_ticker,
                            content_template='content_valuations.html',
@@ -357,26 +340,26 @@ def route_valuations():
 
 @app.route('/update_api_key_action', methods=['POST'])
 def route_update_api_key_action():
-    # ... (כמו קודם) ...
     if request.method == 'POST':
         new_api_key = request.form.get('api_key_input_modal', '').strip()
         try:
             if new_api_key:
                 with open(API_KEY_FILE, 'w') as f:
                     f.write(new_api_key)
-                sf.set_api_key(new_api_key) 
+                sf.set_api_key(new_api_key)
                 session['api_key_status_display'] = get_api_key_status_for_display()
                 flash('מפתח API עודכן בהצלחה!', 'success')
             else:
                 if os.path.exists(API_KEY_FILE):
                     try: os.remove(API_KEY_FILE)
                     except Exception: pass
-                sf.set_api_key('free') 
+                sf.set_api_key('free')
                 session['api_key_status_display'] = get_api_key_status_for_display()
                 flash('מפתח API נמחק/נוקה. האפליקציה תשתמש כעת בנתוני "free".', 'info')
         except Exception as e:
-            session['api_key_status_display'] = f"שגיאה בעדכון: {e}" 
+            session['api_key_status_display'] = f"שגיאה בעדכון: {e}"
             flash(f'שגיאה בעדכון מפתח API: {e}', 'danger')
+            print(f"Error updating API key: {e}") # נשאר - שגיאה חשובה
         return redirect(request.referrer or url_for('route_home'))
     return redirect(url_for('route_home'))
 

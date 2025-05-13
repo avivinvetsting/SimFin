@@ -5,15 +5,17 @@
     {% elif candlestick_chart_json %}
         <div class="row">
             <div class="col-md-12">
-                <div id="candlestickChartDiv"></div> </div>
+                <div id="candlestickChartDiv"></div>
+            </div>
         </div>
         <script type="text/javascript">
             var candlestickData = {{ candlestick_chart_json | safe }};
             if (candlestickData && candlestickData.data && candlestickData.layout) {
                 Plotly.newPlot('candlestickChartDiv', candlestickData.data, candlestickData.layout, {responsive: true});
-                console.log("Candlestick chart plotted.");
+                // console.log("Candlestick chart plotted."); // הוסר
             } else if (candlestickData && candlestickData.error) {
                 document.getElementById('candlestickChartDiv').innerHTML = "<p class='text-danger'>" + candlestickData.error + "</p>";
+                console.error("Candlestick chart error:", candlestickData.error); // נשאר
             } else {
                 document.getElementById('candlestickChartDiv').innerHTML = "<p class='text-secondary'>גרף נרות לא זמין או אין נתונים.</p>";
             }
