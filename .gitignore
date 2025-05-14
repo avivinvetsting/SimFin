@@ -30,3 +30,5 @@ __pycache__/
 
 # Ignore the directory where generated data is saved
 Data/
+
+secret.py
